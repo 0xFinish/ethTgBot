@@ -23,6 +23,12 @@ var infura = os.Getenv("INFURA_API")
 
 var client *ethclient.Client
 
+type TransactionInfo struct {
+	TxInfo    *types.Transaction
+	TxReceipt *types.Receipt
+	TxBlock   *types.Block
+}
+
 func init() {
 	var err error
 	client, err = ethclient.Dial(infura)
@@ -148,37 +154,44 @@ func GetBiggestGasSpender(block string) (spenderAddress string) {
 }
 
 func GetTransactionFee(transaction string) (gasSpent string) {
+	var transactionStruct TransactionInfo
+	var wg sync.WaitGroup
+	var err error
 	txHash := common.HexToHash(transaction)
-	tx, _, err := client.TransactionByHash(context.Background(), txHash)
-
+	wg.Add(2)
+	go func(txHash common.Hash) {
+		defer wg.Done()
+		fmt.Println("I am goroutine running concurrently to get TxInfo")
+		transactionStruct.TxInfo, _, err = client.TransactionByHash(context.Background(), txHash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("I am goroutine DONE concurrently to get TxInfo")
+	}(txHash)
+	go func(txHash common.Hash) {
+		defer wg.Done()
+		fmt.Println("I am goroutine running concurrently to get TxReceipt")
+		transactionStruct.TxReceipt, err = client.TransactionReceipt(context.Background(), txHash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("I am goroutine DONE concurrently to get TxReceipt")
+	}(txHash)
+	wg.Wait()
+	blockData, err := client.BlockByNumber(context.Background(), transactionStruct.TxReceipt.BlockNumber)
 	if err != nil {
 		log.Fatal(err)
 	}
-	txReceipt, err := client.TransactionReceipt(context.Background(), txHash)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blockInt := int(txReceipt.BlockNumber.Uint64())
-	if err != nil {
-		log.Fatal(err)
-	}
-	bigBlockInt := big.NewInt(int64(blockInt))
-	blockData, err := client.BlockByNumber(context.Background(), bigBlockInt)
-	baseFee := blockData.BaseFee()
-	transactionFeeUnit := big.NewInt(int64(txReceipt.GasUsed))
-	var GasWei big.Int
-	var baseFeePlusPriorityFee big.Int
-	baseFeePlusPriorityFee.Add(tx.EffectiveGasTipValue(baseFee), baseFee)
-	GasWei.Mul(transactionFeeUnit, &baseFeePlusPriorityFee)
-	GasGwei := new(big.Float).SetInt(&baseFeePlusPriorityFee)
-	fmt.Println("GasGWEI")
-	fmt.Println(GasGwei)
-	GasGwei.Quo(GasGwei, big.NewFloat(1000000000))
-	fmt.Println(GasGwei)
-	GasWeiFloat := new(big.Float).SetInt(&GasWei)
-	var GasEth big.Float
-	GasEth.Quo(GasWeiFloat, big.NewFloat(1e18))
-	gasSpent = fmt.Sprintf("Total gas spent in ETH: %s \n gasUsedUint: %s \n gasPrice: %s \n gasPriceGwei: %s \n GasUsedEth => gasUsed * (baseFee + PriorityFee) == %s * (%s) / 1e18", GasEth.String(), transactionFeeUnit.String(), baseFeePlusPriorityFee.String(), GasGwei.String(), transactionFeeUnit.String(), baseFeePlusPriorityFee.String())
+	var TotalGasSpentWei big.Int
+	var baseFeePlusPriorityFeeWei big.Int
+	baseFeePlusPriorityFeeWei.Add(transactionStruct.TxInfo.EffectiveGasTipValue(blockData.BaseFee()), blockData.BaseFee())
+	TotalGasSpentWei.Mul(big.NewInt(int64(transactionStruct.TxReceipt.GasUsed)), &baseFeePlusPriorityFeeWei)
+	baseFeePlusPriorityFeeGwei := new(big.Float).SetInt(&baseFeePlusPriorityFeeWei)
+	baseFeePlusPriorityFeeGwei.Quo(baseFeePlusPriorityFeeGwei, big.NewFloat(1000000000))
+	GasWeiFloat := new(big.Float).SetInt(&TotalGasSpentWei)
+	var TotalGasSpentEth big.Float
+	TotalGasSpentEth.Quo(GasWeiFloat, big.NewFloat(1e18))
+	gasSpent = fmt.Sprintf("Total gas spent in ETH: %s \n gasUsedUint: %d \n gasPrice: %s \n gasPriceGwei: %s \n GasUsedEth => gasUsed * (baseFee + PriorityFee) == %d * (%s) / 1e18", TotalGasSpentEth.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String(), baseFeePlusPriorityFeeGwei.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String())
 	return
 }
 
@@ -188,5 +201,6 @@ func GetBiggestBlockWallet(block string) (biggestAddress string) {
 }
 
 func GetAddressInfo(address string) (info string) {
+
 	return
 }

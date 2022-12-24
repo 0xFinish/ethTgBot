@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -131,6 +132,8 @@ func GetBiggestGasSpender(block string) (spenderAddress string) {
 			var GasEth big.Float
 			GasEth.Quo(GasWeiFloat, big.NewFloat(1e18))
 			if GasEth.Cmp(&findBiggest) == 1 {
+				fmt.Println(tx.GasPrice(), transactionFeeUnit)
+				fmt.Printf("The bigger gas spender found \n address:%s, gasSpent: %s", tx.Hash().Hex(), GasEth.String())
 				findBiggest = GasEth
 				address = tx.Hash().Hex()
 			}
@@ -140,11 +143,47 @@ func GetBiggestGasSpender(block string) (spenderAddress string) {
 	wg.Wait()
 	elapsed := time.Since(start)
 	fmt.Printf("Time elapsed: %s\n", elapsed)
-	spenderAddress = findBiggest.String() + " \n " + address
+	spenderAddress = findBiggest.String() + " ETH " + " \n " + address
+	return
+}
+
+func GetTransactionFee(transaction string) (gasSpent string) {
+	txHash := common.HexToHash(transaction)
+	tx, _, err := client.TransactionByHash(context.Background(), txHash)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	txReceipt, err := client.TransactionReceipt(context.Background(), txHash)
+	if err != nil {
+		log.Fatal(err)
+	}
+	blockInt := int(txReceipt.BlockNumber.Uint64())
+	if err != nil {
+		log.Fatal(err)
+	}
+	bigBlockInt := big.NewInt(int64(blockInt))
+	blockData, err := client.BlockByNumber(context.Background(), bigBlockInt)
+	baseFee := blockData.BaseFee()
+	transactionFeeUnit := big.NewInt(int64(txReceipt.GasUsed))
+	var GasWei big.Int
+	var baseFeePlusPriorityFee big.Int
+	baseFeePlusPriorityFee.Add(tx.EffectiveGasTipValue(baseFee), baseFee)
+	GasWei.Mul(transactionFeeUnit, &baseFeePlusPriorityFee)
+	GasGwei := new(big.Float).SetInt(&baseFeePlusPriorityFee)
+	fmt.Println("GasGWEI")
+	fmt.Println(GasGwei)
+	GasGwei.Quo(GasGwei, big.NewFloat(1000000000))
+	fmt.Println(GasGwei)
+	GasWeiFloat := new(big.Float).SetInt(&GasWei)
+	var GasEth big.Float
+	GasEth.Quo(GasWeiFloat, big.NewFloat(1e18))
+	gasSpent = fmt.Sprintf("Total gas spent in ETH: %s \n gasUsedUint: %s \n gasPrice: %s \n gasPriceGwei: %s \n GasUsedEth => gasUsed * (baseFee + PriorityFee) == %s * (%s) / 1e18", GasEth.String(), transactionFeeUnit.String(), baseFeePlusPriorityFee.String(), GasGwei.String(), transactionFeeUnit.String(), baseFeePlusPriorityFee.String())
 	return
 }
 
 func GetBiggestBlockWallet(block string) (biggestAddress string) {
+
 	return
 }
 

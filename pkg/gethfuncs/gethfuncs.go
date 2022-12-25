@@ -127,20 +127,20 @@ func GetBiggestGasSpender(block string) (spenderAddress string) {
 		go func(tx *types.Transaction, i int) {
 			defer wg.Done()
 			fmt.Printf("I am goroutine running concurrently my num is %d \n", i)
-			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			TxReceipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 			if err != nil {
 				log.Fatal(err)
 			}
-			transactionFeeUnit := big.NewInt(int64(receipt.GasUsed))
-			var GasWei big.Int
-			GasWei.Mul(transactionFeeUnit, tx.GasPrice())
-			GasWeiFloat := new(big.Float).SetInt(&GasWei)
-			var GasEth big.Float
-			GasEth.Quo(GasWeiFloat, big.NewFloat(1e18))
-			if GasEth.Cmp(&findBiggest) == 1 {
-				fmt.Println(tx.GasPrice(), transactionFeeUnit)
-				fmt.Printf("The bigger gas spender found \n address:%s, gasSpent: %s", tx.Hash().Hex(), GasEth.String())
-				findBiggest = GasEth
+			var TotalGasSpentWei big.Int
+			var baseFeePlusPriorityFeeWei big.Int
+			baseFeePlusPriorityFeeWei.Add(tx.EffectiveGasTipValue(blockData.BaseFee()), blockData.BaseFee())
+			TotalGasSpentWei.Mul(big.NewInt(int64(TxReceipt.GasUsed)), &baseFeePlusPriorityFeeWei)
+			GasWeiFloat := new(big.Float).SetInt(&TotalGasSpentWei)
+			var TotalGasSpentEth big.Float
+			TotalGasSpentEth.Quo(GasWeiFloat, big.NewFloat(1e18))
+			if TotalGasSpentEth.Cmp(&findBiggest) == 1 {
+				fmt.Printf("The bigger gas spender found \n address:%s, gasSpent: %s", tx.Hash().Hex(), TotalGasSpentEth.String())
+				findBiggest = TotalGasSpentEth
 				address = tx.Hash().Hex()
 			}
 			fmt.Printf("I am goroutine DONE my num is %d \n", i)
@@ -153,7 +153,7 @@ func GetBiggestGasSpender(block string) (spenderAddress string) {
 	return
 }
 
-func GetTransactionFee(transaction string) (gasSpent string) {
+func GetTransactionFee(transaction string) (gasSpentMessage string, PureGasValue big.Float) {
 	var transactionStruct TransactionInfo
 	var wg sync.WaitGroup
 	var err error
@@ -191,7 +191,8 @@ func GetTransactionFee(transaction string) (gasSpent string) {
 	GasWeiFloat := new(big.Float).SetInt(&TotalGasSpentWei)
 	var TotalGasSpentEth big.Float
 	TotalGasSpentEth.Quo(GasWeiFloat, big.NewFloat(1e18))
-	gasSpent = fmt.Sprintf("Total gas spent in ETH: %s \n gasUsedUint: %d \n gasPrice: %s \n gasPriceGwei: %s \n GasUsedEth => gasUsed * (baseFee + PriorityFee) == %d * (%s) / 1e18", TotalGasSpentEth.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String(), baseFeePlusPriorityFeeGwei.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String())
+	gasSpentMessage = fmt.Sprintf("Total gas spent in ETH: %s \n gasUsedUint: %d \n gasPrice: %s \n gasPriceGwei: %s \n GasUsedEth => gasUsed * (baseFee + PriorityFee) == %d * (%s) / 1e18", TotalGasSpentEth.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String(), baseFeePlusPriorityFeeGwei.String(), transactionStruct.TxReceipt.GasUsed, baseFeePlusPriorityFeeWei.String())
+	PureGasValue = TotalGasSpentEth
 	return
 }
 

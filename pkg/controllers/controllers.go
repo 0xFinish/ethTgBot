@@ -32,7 +32,8 @@ func switcher(command string, args string) string {
 	case "getGasSpent":
 		return gethfuncs.GetGasSpent(args)
 	case "getTransactionFee":
-		return gethfuncs.GetTransactionFee(args)
+		returnValue, _ := gethfuncs.GetTransactionFee(args)
+		return returnValue
 	case "getBiggestGasSpender":
 		return gethfuncs.GetBiggestGasSpender(args)
 	case "getBiggestBlockWallet":

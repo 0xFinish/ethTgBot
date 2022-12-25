@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -66,7 +65,6 @@ func GetCurrentBlockNum() (currentBlock string) {
 
 func GetGasSpent(block string) (gasSpent string) {
 	start := time.Now()
-	var transactionArray []string
 	fmt.Println(block)
 	blockInt, err := strconv.Atoi(block)
 	if err != nil {
@@ -78,30 +76,29 @@ func GetGasSpent(block string) (gasSpent string) {
 		log.Fatal(err)
 	}
 	transactions := blockData.Transactions()
+	var TotalGasSpent big.Float
 	var wg sync.WaitGroup
 	for i, tx := range transactions {
 		wg.Add(1)
 		go func(tx *types.Transaction, i int) {
 			defer wg.Done()
 			fmt.Printf("I am goroutine running concurrently my num is %d \n", i)
-			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			TxReceipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 			if err != nil {
 				log.Fatal(err)
 			}
-			transactionArray = append(transactionArray, tx.Hash().Hex())
-			// transactionFeeUint := (big.NewInt(int64(receipt.GasUsed))  tx.GasPrice())
-			transactionFeeUnit := big.NewInt(int64(receipt.GasUsed))
-			var GasWei big.Int
-			GasWei.Mul(transactionFeeUnit, tx.GasPrice())
-			GasWeiFloat := new(big.Float).SetInt(&GasWei)
-			var GasEth big.Float
-			GasEth.Quo(GasWeiFloat, big.NewFloat(1e18))
-			transactionArray = append(transactionArray, GasEth.String())
-			fmt.Printf("I am goroutine DONE my num is %d \n", i)
+			var TotalGasSpentWei big.Int
+			var baseFeePlusPriorityFeeWei big.Int
+			baseFeePlusPriorityFeeWei.Add(tx.EffectiveGasTipValue(blockData.BaseFee()), blockData.BaseFee())
+			TotalGasSpentWei.Mul(big.NewInt(int64(TxReceipt.GasUsed)), &baseFeePlusPriorityFeeWei)
+			GasWeiFloat := new(big.Float).SetInt(&TotalGasSpentWei)
+			var TotalGasSpentEth big.Float
+			TotalGasSpentEth.Quo(GasWeiFloat, big.NewFloat(1e18))
+			TotalGasSpent.Add(&TotalGasSpent, &TotalGasSpentEth)
 		}(tx, i)
 	}
 	wg.Wait()
-	gasSpent = strings.Join(transactionArray[:30], ", \n")
+	gasSpent = TotalGasSpent.String() + " ETH"
 	elapsed := time.Since(start)
 	fmt.Printf("Time elapsed: %s\n", elapsed)
 	return
@@ -196,8 +193,63 @@ func GetTransactionFee(transaction string) (gasSpentMessage string, PureGasValue
 	return
 }
 
-func GetBiggestBlockWallet(block string) (biggestAddress string) {
+func GetTransactionSender(transaction string) (txSender string) {
+	txHash := common.HexToHash(transaction)
+	txInfo, _, err := client.TransactionByHash(context.Background(), txHash)
+	if err != nil {
+		log.Fatal(err)
+	}
+	txMessage, err := txInfo.AsMessage(types.LatestSignerForChainID(txInfo.ChainId()), big.NewInt(1))
+	if err != nil {
+		log.Fatal(err)
+	}
+	txSender = txMessage.From().String()
+	return
 
+}
+
+func GetBiggestBlockWallet(block string) (biggestAddress string) {
+	start := time.Now()
+	fmt.Println(block)
+	blockInt, err := strconv.Atoi(block)
+	if err != nil {
+		log.Fatal(err)
+	}
+	bigBlockInt := big.NewInt(int64(blockInt))
+	blockData, err := client.BlockByNumber(context.Background(), bigBlockInt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	transactions := blockData.Transactions()
+	var wg sync.WaitGroup
+	var biggestBalance big.Int
+	var biggestBalanceAddress string
+	for _, tx := range transactions {
+		wg.Add(1)
+		go func(tx *types.Transaction) {
+			defer wg.Done()
+			txMessage, err := tx.AsMessage(types.LatestSignerForChainID(tx.ChainId()), big.NewInt(1))
+			if err != nil {
+				log.Fatal(err)
+			}
+			balance, err := client.BalanceAt(context.Background(), txMessage.From(), bigBlockInt)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if balance.Cmp(&biggestBalance) == 1 {
+				// fmt.Printf("The bigger gas spender found \n address:%s, gasSpent: %s", tx.Hash().Hex(), TotalGasSpentEth.String())
+				biggestBalance = *balance
+				biggestBalanceAddress = txMessage.From().Hex()
+			}
+		}(tx)
+	}
+	wg.Wait()
+	GasWeiFloat := new(big.Float).SetInt(&biggestBalance)
+	var biggestBalanceFloat big.Float
+	biggestBalanceFloat.Quo(GasWeiFloat, big.NewFloat(1e18))
+	elapsed := time.Since(start)
+	fmt.Printf("Time elapsed: %s\n", elapsed)
+	biggestAddress = fmt.Sprintf("The biggest account: %s \n with balance: %s ETH \n in the block %d ", biggestBalanceAddress, biggestBalanceFloat.String(), blockInt)
 	return
 }
 

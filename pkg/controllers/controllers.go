@@ -25,7 +25,7 @@ func HandleMessage(bot *tgbotapi.BotAPI, update tgbotapi.Update, message string)
 
 func switcher(command string, args string) string {
 	switch command {
-	case "create":
+	case "createNewWallet":
 		return gethfuncs.CreateNewWallet()
 	case "getCurrentBlockNum":
 		return gethfuncs.GetCurrentBlockNum()
@@ -34,6 +34,8 @@ func switcher(command string, args string) string {
 	case "getTransactionFee":
 		returnValue, _ := gethfuncs.GetTransactionFee(args)
 		return returnValue
+	case "getTransactionSender":
+		return gethfuncs.GetTransactionSender(args)
 	case "getBiggestGasSpender":
 		return gethfuncs.GetBiggestGasSpender(args)
 	case "getBiggestBlockWallet":

@@ -254,6 +254,29 @@ func GetBiggestBlockWallet(block string) (biggestAddress string) {
 }
 
 func GetAddressInfo(address string) (info string) {
-
+	var transactionStruct TransactionInfo
+	var wg sync.WaitGroup
+	var err error
+	txHash := common.HexToHash(address)
+	wg.Add(2)
+	go func(txHash common.Hash) {
+		defer wg.Done()
+		fmt.Println("I am goroutine running concurrently to get TxInfo")
+		transactionStruct.TxInfo, _, err = client.TransactionByHash(context.Background(), txHash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("I am goroutine DONE concurrently to get TxInfo")
+	}(txHash)
+	go func(txHash common.Hash) {
+		defer wg.Done()
+		fmt.Println("I am goroutine running concurrently to get TxReceipt")
+		transactionStruct.TxReceipt, err = client.TransactionReceipt(context.Background(), txHash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("I am goroutine DONE concurrently to get TxReceipt")
+	}(txHash)
+	wg.Wait()
 	return
 }

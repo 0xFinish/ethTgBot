@@ -254,29 +254,14 @@ func GetBiggestBlockWallet(block string) (biggestAddress string) {
 }
 
 func GetAddressInfo(address string) (info string) {
-	var transactionStruct TransactionInfo
-	var wg sync.WaitGroup
-	var err error
-	txHash := common.HexToHash(address)
-	wg.Add(2)
-	go func(txHash common.Hash) {
-		defer wg.Done()
-		fmt.Println("I am goroutine running concurrently to get TxInfo")
-		transactionStruct.TxInfo, _, err = client.TransactionByHash(context.Background(), txHash)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("I am goroutine DONE concurrently to get TxInfo")
-	}(txHash)
-	go func(txHash common.Hash) {
-		defer wg.Done()
-		fmt.Println("I am goroutine running concurrently to get TxReceipt")
-		transactionStruct.TxReceipt, err = client.TransactionReceipt(context.Background(), txHash)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("I am goroutine DONE concurrently to get TxReceipt")
-	}(txHash)
-	wg.Wait()
+	addressHash := common.HexToAddress(address)
+	balanceWei, err := client.BalanceAt(context.Background(), addressHash, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	GasWeiFloat := new(big.Float).SetInt(balanceWei)
+	var biggestBalanceFloat big.Float
+	biggestBalanceFloat.Quo(GasWeiFloat, big.NewFloat(1e18))
+	info = fmt.Sprintf("The account balance of the address is %s wei", biggestBalanceFloat.String())
 	return
 }

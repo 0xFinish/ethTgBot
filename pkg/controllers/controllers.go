@@ -42,8 +42,9 @@ func switcher(command string, args string) string {
 		return gethfuncs.GetBiggestBlockWallet(args)
 	case "getAddressInfo":
 		return gethfuncs.GetAddressInfo(args)
+	case "sendTransaction":
+		return gethfuncs.SendTransaction(args)
 	default:
 		return "Please choose the provided command"
 	}
-
 }

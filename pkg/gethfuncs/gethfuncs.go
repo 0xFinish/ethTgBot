@@ -19,6 +19,7 @@ import (
 )
 
 var infura = os.Getenv("INFURA_API")
+var goerliInfura = os.Getenv("INFURA_GOERLI")
 
 var client *ethclient.Client
 
@@ -205,7 +206,6 @@ func GetTransactionSender(transaction string) (txSender string) {
 	}
 	txSender = txMessage.From().String()
 	return
-
 }
 
 func GetBiggestBlockWallet(block string) (biggestAddress string) {
@@ -263,5 +263,48 @@ func GetAddressInfo(address string) (info string) {
 	var biggestBalanceFloat big.Float
 	biggestBalanceFloat.Quo(GasWeiFloat, big.NewFloat(1e18))
 	info = fmt.Sprintf("The account balance of the address is %s wei", biggestBalanceFloat.String())
+	return
+}
+
+func SendTransaction(address string) (info string) {
+	goerliClient, err := ethclient.Dial(goerliInfura)
+	if err != nil {
+		log.Fatal(err)
+	}
+	privateKey, err := crypto.HexToECDSA(os.Getenv("GOERLI_TESTNET_WALLET_PK"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		log.Fatal("can not assert type")
+	}
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	nonce, err := goerliClient.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	value := big.NewInt(1e3)
+	gasLimit := uint64(21000)
+	gasPrice, err := goerliClient.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	toAddress := common.HexToAddress(address)
+	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
+	chainId, err := goerliClient.NetworkID(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainId), privateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = goerliClient.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("tx sent: %s", signedTx.Hash().Hex())
 	return
 }

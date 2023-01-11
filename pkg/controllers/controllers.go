@@ -48,6 +48,8 @@ func switcher(command string, args string) string {
 		return gethfuncs.SendTransactionERC20(args)
 	case "newBlockInfo":
 		return gethfuncs.NewBlockInfoWSS()
+	case "rawTransaction":
+		return gethfuncs.RawTransaction(args)
 	default:
 		return "Please choose the provided command"
 	}

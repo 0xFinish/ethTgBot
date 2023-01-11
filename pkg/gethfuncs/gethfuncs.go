@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -21,6 +20,7 @@ import (
 )
 
 var infura = os.Getenv("INFURA_API")
+var infuraWSS = os.Getenv("INFURA_WSS")
 var goerliInfura = os.Getenv("INFURA_GOERLI")
 
 var client *ethclient.Client
@@ -416,7 +416,7 @@ func SendTransactionERC20(address string) (info string) {
 	}
 
 	toAddress := common.HexToAddress(address)
-	tokenAddress := common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")
+	// tokenAddress := common.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB")
 
 	transferFnSignature := []byte("transfer(address,uint256)")
 	hash := sha3.NewLegacyKeccak256()
@@ -428,7 +428,7 @@ func SendTransactionERC20(address string) (info string) {
 	fmt.Println(hexutil.Encode(paddedAddress)) // 0x0000000000000000000000004592d8f8d7b001e72cb26a73e4fa1806a51ac79d
 
 	amount := new(big.Int)
-	amount.SetString("1000000000000000000000", 10) // sets the value to 1000 tokens, in the token denomination
+	amount.SetString("10000", 10) // sets the value to 1000 tokens, in the token denomination
 
 	paddedAmount := common.LeftPadBytes(amount.Bytes(), 32)
 	fmt.Println(hexutil.Encode(paddedAmount)) // 0x00000000000000000000000000000000000000000000003635c9adc5dea00000
@@ -438,16 +438,18 @@ func SendTransactionERC20(address string) (info string) {
 	data = append(data, paddedAddress...)
 	data = append(data, paddedAmount...)
 
-	gasLimit, err := goerliClient.EstimateGas(context.Background(), ethereum.CallMsg{
-		To:   &tokenAddress,
-		Data: data,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(gasLimit) // 23256
+	// gasLimit, err := goerliClient.EstimateGas(context.Background(), ethereum.CallMsg{
+	// 	To:   &tokenAddress,
+	// 	Data: data,
+	// })
+	// if err != nil {
+	// 	fmt.Println("The error is here")
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println(gasLimit) // 23256
+	gasLimit := uint64(23256)
 
-	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit, gasPrice, data)
+	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
 
 	chainID, err := goerliClient.NetworkID(context.Background())
 	if err != nil {
@@ -466,4 +468,32 @@ func SendTransactionERC20(address string) (info string) {
 
 	info = fmt.Sprintf("tx sent: %s", signedTx.Hash().Hex()) // tx sent: 0xa56316b637a94c4cc0331c73ef26389d6c097506d581073f927275e7a6ece0bc
 	return
+}
+
+func NewBlockInfoWSS() (info string) {
+	clientWSS, err := ethclient.Dial(infuraWSS)
+	if err != nil {
+		log.Fatal(err)
+	}
+	headers := make(chan *types.Header)
+	sub, err := clientWSS.SubscribeNewHead(context.Background(), headers)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		select {
+		case err := <-sub.Err():
+			log.Fatal(err)
+		case header := <-headers:
+			fmt.Println(header.Hash().Hex())
+			block, err := client.BlockByHash(context.Background(), header.Hash())
+			if err != nil {
+				log.Fatal(err)
+			}
+			info = block.Hash().Hex() + " " + block.Number().String() // 0xbc10defa8dda384c96a17640d84de5578804945d347072e091b4e5f390ddea7f
+			fmt.Println(block.Time())                                 // 1529525947
+			fmt.Println(block.Nonce())                                // 130524141876765836
+			fmt.Println(len(block.Transactions()))                    // 7
+		}
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/fi9ish/ethTgBot/pkg/gethfuncs"
+	"github.com/fi9ish/ethTgBot/pkg/smartContracts"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -50,6 +51,8 @@ func switcher(command string, args string) string {
 		return gethfuncs.NewBlockInfoWSS()
 	case "rawTransaction":
 		return gethfuncs.RawTransaction(args)
+	case "deployDefaultContract":
+		return smartContracts.DeploySmartContract()
 	default:
 		return "Please choose the provided command"
 	}

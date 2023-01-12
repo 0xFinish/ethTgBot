@@ -53,7 +53,7 @@ func DeploySmartContract() (info string) {
 	}
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)
-	auth.GasLimit = uint64(300000)
+	auth.GasLimit = uint64(500000)
 	auth.GasPrice = gasPrice
 
 	input := "1.0"

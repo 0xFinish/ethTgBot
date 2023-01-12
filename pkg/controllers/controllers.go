@@ -53,6 +53,10 @@ func switcher(command string, args string) string {
 		return gethfuncs.RawTransaction(args)
 	case "deployDefaultContract":
 		return smartContracts.DeploySmartContract()
+	case "readContractInstance":
+		return smartContracts.ReadContractInstance(args)
+	case "writeToContractInstance":
+		return smartContracts.WriteToContractInstance(args)
 	default:
 		return "Please choose the provided command"
 	}

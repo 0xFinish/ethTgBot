@@ -3,6 +3,7 @@ package smartContracts
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/fi9ish/ethTgBot/pkg/store"
+	"github.com/fi9ish/ethTgBot/pkg/token"
 )
 
 func DeploySmartContract() (info string) {
@@ -154,6 +156,77 @@ func WriteToContractInstance(address string) (info string) {
 	}
 
 	fmt.Println(string(result[:])) // "bar"
+
+	return
+}
+
+func ReadSmartContractBytecode(address string) (info string) {
+	goerliClient, err := ethclient.Dial(os.Getenv("INFURA_GOERLI"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	contractAddress := common.HexToAddress(address)
+	bytecode, err := goerliClient.CodeAt(context.Background(), contractAddress, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(hex.EncodeToString(bytecode))
+
+	return
+}
+
+func QueryingERC20(address string) (info string) {
+	goerliClient, err := ethclient.Dial(os.Getenv("INFURA_GOERLI"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tokenAddress := common.HexToAddress(address)
+	instance, err := token.NewToken(tokenAddress, goerliClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	privateKey, err := crypto.HexToECDSA(os.Getenv("GOERLI_TESTNET_WALLET_PK"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		log.Fatal("cannot assert type")
+	}
+
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+
+	bal, err := instance.BalanceOf(&bind.TransactOpts{}, fromAddress)
+	if err != nil {
+		fmt.Println("The error is here")
+		log.Fatal(err)
+	}
+
+	fmt.Printf("wei: %s\n", bal)
+
+	name, err := instance.Name(&bind.CallOpts{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	symbol, err := instance.Symbol(&bind.CallOpts{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	decimals, err := instance.Decimals(&bind.CallOpts{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("name: %s\n", name)
+	fmt.Printf("symbol: %s\n", symbol)
+	fmt.Printf("decimals: %v\n", decimals)
 
 	return
 }

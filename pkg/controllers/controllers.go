@@ -57,6 +57,10 @@ func switcher(command string, args string) string {
 		return smartContracts.ReadContractInstance(args)
 	case "writeToContractInstance":
 		return smartContracts.WriteToContractInstance(args)
+	case "readSmartContractBytecode":
+		return smartContracts.ReadSmartContractBytecode(args)
+	case "queryingERC20":
+		return smartContracts.QueryingERC20(args)
 	default:
 		return "Please choose the provided command"
 	}
